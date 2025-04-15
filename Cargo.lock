@@ -856,7 +856,6 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "azalea",
- "azalea-entity",
  "bevy_ecs",
  "bevy_ecs_macros",
  "tokio",

@@ -1,54 +1,60 @@
-use std::{
-	borrow::Cow,
-	cell::RefCell,
-	rc::Rc,
-	sync::{Arc, Mutex},
-	time::Duration,
-};
+use std::time::Duration;
 
 use azalea::{
-	prelude::Component, protocol::packets::game::ClientboundGamePacket, swarm::SwarmBuilder,
-	world::MinecraftEntityId, Account, BlockPos, BotClientExt, Client, ClientBuilder, Event, Vec3,
+	protocol::packets::game::ClientboundGamePacket,
+	swarm::{Swarm, SwarmBuilder, SwarmEvent},
+	Account, Client, Event,
 };
 
 pub mod execute;
 use execute::*;
+
+pub mod modules;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
 	println!("Hello, world!");
 
 	let accounts = |suffix| {
-		[
-			"fasz",
-			"pocs",
-			"spectator",
-			"bot",
-			"mike",
-			"john_deer",
-			"popcorn",
-			"popbob",
-		]
-		.into_iter()
-		.map(move |base| format!("{base}{suffix}"))
+		["pop", "bob", "test"]
+			.into_iter()
+			.map(move |base| format!("{base}{suffix}"))
 	};
 	let accounts = accounts("")
-		.chain(accounts("_1"))
-		.chain(accounts("_2"))
-		.chain(accounts("_fuk12"))
+		// .chain(accounts("_1"))
 		.map(|name| Account::offline(name.as_ref()))
 		.collect::<Vec<_>>();
 
 	SwarmBuilder::new()
 		.add_accounts(accounts)
 		.set_handler(handle)
+		.set_swarm_handler(swarm_handler)
 		.join_delay(Duration::from_millis(50))
 		.start("localhost")
 		.await?
 }
 
-#[derive(Default, Clone, bevy_ecs_macros::Component)]
+#[derive(Default, Clone, bevy_ecs_macros::Component, bevy_ecs_macros::Resource)]
 pub struct State;
+
+async fn swarm_handler(swarm: Swarm, event: SwarmEvent, state: State) {
+	match event {
+		SwarmEvent::Chat(m) => {
+			let content = m.content();
+			let mut words = content.split(' ');
+
+			if words.next() == Some("gang") {
+				match execute_swarm(words, swarm, state, m).await {
+					Ok(_) => {}
+					Err(err) => {
+						eprintln!("swarm command failed: \"{content}\"\n{err}")
+					}
+				}
+			}
+		}
+		_ => {}
+	}
+}
 
 async fn handle(bot: Client, event: Event, state: State) -> anyhow::Result<()> {
 	match event {
@@ -56,10 +62,15 @@ async fn handle(bot: Client, event: Event, state: State) -> anyhow::Result<()> {
 			let content = m.content();
 			let mut words = content.split(' ');
 
-			if words.next() == Some("gang") {
-				if words.next() == Some("listen") {
-					execute(words, bot, state, m);
-				}
+			let username = bot.username();
+			let name = words.next();
+			if name == Some("gang") || name == Some(&username) {
+				match execute(words, bot, state, m).await {
+					Ok(_) => {}
+					Err(err) => {
+						eprintln!("{} failed at: \"{}\"\n{err}", username, content)
+					}
+				};
 			}
 		}
 		Event::Packet(packet) => match packet.as_ref() {
