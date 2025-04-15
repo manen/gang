@@ -1,0 +1,13 @@
+[package]
+name = "client"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+utils.workspace = true
+anyhow = "1.0.97"
+azalea.git = "https://github.com/azalea-rs/azalea"
+azalea-entity.git = "https://github.com/azalea-rs/azalea"
+bevy_ecs = "0.15.3"
+bevy_ecs_macros = "0.15.3"
+tokio = { version = "1.44.2", features = ["macros", "rt-multi-thread"] }
