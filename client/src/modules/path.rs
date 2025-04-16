@@ -48,6 +48,7 @@ pub async fn path<'a, I: IntoIterator<Item = &'a str>>(
 				x: (bot.position().x + x_offset as f64 - x_offset as f64 / 2.0).round() as i32,
 				z: (bot.position().z + z_offset as f64 - x_offset as f64 / 2.0).round() as i32,
 			})
+			.await
 		}
 		Some("to") => {
 			{
@@ -59,14 +60,16 @@ pub async fn path<'a, I: IntoIterator<Item = &'a str>>(
 							y: second.parse()?,
 							z: third.parse()?,
 						}))
+						.await
 					} else {
 						bot.goto(XZGoal {
 							x: first.parse()?,
 							z: second.parse()?,
 						})
+						.await
 					}
 				} else {
-					bot.goto(YGoal { y: first.parse()? })
+					bot.goto(YGoal { y: first.parse()? }).await
 				}
 			};
 		}

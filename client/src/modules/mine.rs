@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use azalea::{
 	blocks::{BlockState, BlockStates},
 	chat::ChatPacket,
@@ -6,6 +8,7 @@ use azalea::{
 	swarm::Swarm,
 	BlockPos, BotClientExt, Client,
 };
+use tokio::sync::Mutex;
 
 use crate::State;
 
@@ -19,7 +22,7 @@ pub async fn mine<'a, I: IntoIterator<Item = &'a str>>(
 	let mut iter = iter.into_iter();
 	match iter.next() {
 		Some("grass") => {
-			mine_specific(swarm, [blocks::GrassBlock { snowy: false }.into()]);
+			mine_a_lot(swarm, [blocks::GrassBlock { snowy: false }.into()], 10);
 		}
 		Some("leaves") => mine_specific(
 			swarm,
@@ -52,8 +55,8 @@ pub async fn mine<'a, I: IntoIterator<Item = &'a str>>(
 	Ok(())
 }
 
-fn mine_a_lot<I: IntoIterator<Item = BlockState>>(swarm: Swarm, states: I) {
-	// let mut occupied = vec![];
+fn mine_a_lot<I: IntoIterator<Item = BlockState>>(swarm: Swarm, states: I, count_per_bot: i32) {
+	let mut occupied = Arc::new(Mutex::new(Vec::<BlockPos>::new()));
 
 	let states = states.into_iter();
 	let states = BlockStates {
@@ -97,9 +100,9 @@ fn mine_specific<I: IntoIterator<Item = BlockState>>(swarm: Swarm, states: I) {
 				bot.goto(RadiusGoal {
 					pos: pos.center(),
 					radius: 3.5,
-				});
+				})
+				.await;
 
-				while bot.position().distance_to(&pos.center()) > 4.0 {}
 				bot.look_at(pos.center());
 				bot.mine(pos).await;
 			}

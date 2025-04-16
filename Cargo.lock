@@ -154,7 +154,7 @@ checksum = "ace50bade8e6234aa140d9a2f552bbee1db4d353f69b8217bc503490fc1a9f26"
 [[package]]
 name = "azalea"
 version = "0.12.0+mc1.21.5"
-source = "git+https://github.com/azalea-rs/azalea#fd27ca3becb06f34e11638c00e703918f713dd96"
+source = "git+https://github.com/azalea-rs/azalea?rev=6a83a6f#6a83a6fa387170ae71fbe06791cf3afa20aac1df"
 dependencies = [
  "azalea-auth",
  "azalea-block",
@@ -192,7 +192,7 @@ dependencies = [
 [[package]]
 name = "azalea-auth"
 version = "0.12.0+mc1.21.5"
-source = "git+https://github.com/azalea-rs/azalea#fd27ca3becb06f34e11638c00e703918f713dd96"
+source = "git+https://github.com/azalea-rs/azalea?rev=6a83a6f#6a83a6fa387170ae71fbe06791cf3afa20aac1df"
 dependencies = [
  "azalea-buf",
  "azalea-crypto",
@@ -212,7 +212,7 @@ dependencies = [
 [[package]]
 name = "azalea-block"
 version = "0.12.0+mc1.21.5"
-source = "git+https://github.com/azalea-rs/azalea#fd27ca3becb06f34e11638c00e703918f713dd96"
+source = "git+https://github.com/azalea-rs/azalea?rev=6a83a6f#6a83a6fa387170ae71fbe06791cf3afa20aac1df"
 dependencies = [
  "azalea-block-macros",
  "azalea-buf",
@@ -222,7 +222,7 @@ dependencies = [
 [[package]]
 name = "azalea-block-macros"
 version = "0.12.0+mc1.21.5"
-source = "git+https://github.com/azalea-rs/azalea#fd27ca3becb06f34e11638c00e703918f713dd96"
+source = "git+https://github.com/azalea-rs/azalea?rev=6a83a6f#6a83a6fa387170ae71fbe06791cf3afa20aac1df"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -232,7 +232,7 @@ dependencies = [
 [[package]]
 name = "azalea-brigadier"
 version = "0.12.0+mc1.21.5"
-source = "git+https://github.com/azalea-rs/azalea#fd27ca3becb06f34e11638c00e703918f713dd96"
+source = "git+https://github.com/azalea-rs/azalea?rev=6a83a6f#6a83a6fa387170ae71fbe06791cf3afa20aac1df"
 dependencies = [
  "azalea-buf",
  "azalea-chat",
@@ -242,7 +242,7 @@ dependencies = [
 [[package]]
 name = "azalea-buf"
 version = "0.12.0+mc1.21.5"
-source = "git+https://github.com/azalea-rs/azalea#fd27ca3becb06f34e11638c00e703918f713dd96"
+source = "git+https://github.com/azalea-rs/azalea?rev=6a83a6f#6a83a6fa387170ae71fbe06791cf3afa20aac1df"
 dependencies = [
  "azalea-buf-macros",
  "byteorder",
@@ -256,7 +256,7 @@ dependencies = [
 [[package]]
 name = "azalea-buf-macros"
 version = "0.12.0+mc1.21.5"
-source = "git+https://github.com/azalea-rs/azalea#fd27ca3becb06f34e11638c00e703918f713dd96"
+source = "git+https://github.com/azalea-rs/azalea?rev=6a83a6f#6a83a6fa387170ae71fbe06791cf3afa20aac1df"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -266,7 +266,7 @@ dependencies = [
 [[package]]
 name = "azalea-chat"
 version = "0.12.0+mc1.21.5"
-source = "git+https://github.com/azalea-rs/azalea#fd27ca3becb06f34e11638c00e703918f713dd96"
+source = "git+https://github.com/azalea-rs/azalea?rev=6a83a6f#6a83a6fa387170ae71fbe06791cf3afa20aac1df"
 dependencies = [
  "azalea-buf",
  "azalea-language",
@@ -280,7 +280,7 @@ dependencies = [
 [[package]]
 name = "azalea-client"
 version = "0.12.0+mc1.21.5"
-source = "git+https://github.com/azalea-rs/azalea#fd27ca3becb06f34e11638c00e703918f713dd96"
+source = "git+https://github.com/azalea-rs/azalea?rev=6a83a6f#6a83a6fa387170ae71fbe06791cf3afa20aac1df"
 dependencies = [
  "azalea-auth",
  "azalea-block",
@@ -315,7 +315,7 @@ dependencies = [
 [[package]]
 name = "azalea-core"
 version = "0.12.0+mc1.21.5"
-source = "git+https://github.com/azalea-rs/azalea#fd27ca3becb06f34e11638c00e703918f713dd96"
+source = "git+https://github.com/azalea-rs/azalea?rev=6a83a6f#6a83a6fa387170ae71fbe06791cf3afa20aac1df"
 dependencies = [
  "azalea-buf",
  "azalea-chat",
@@ -332,7 +332,7 @@ dependencies = [
 [[package]]
 name = "azalea-crypto"
 version = "0.12.0+mc1.21.5"
-source = "git+https://github.com/azalea-rs/azalea#fd27ca3becb06f34e11638c00e703918f713dd96"
+source = "git+https://github.com/azalea-rs/azalea?rev=6a83a6f#6a83a6fa387170ae71fbe06791cf3afa20aac1df"
 dependencies = [
  "aes",
  "azalea-buf",
@@ -349,7 +349,7 @@ dependencies = [
 [[package]]
 name = "azalea-entity"
 version = "0.12.0+mc1.21.5"
-source = "git+https://github.com/azalea-rs/azalea#fd27ca3becb06f34e11638c00e703918f713dd96"
+source = "git+https://github.com/azalea-rs/azalea?rev=6a83a6f#6a83a6fa387170ae71fbe06791cf3afa20aac1df"
 dependencies = [
  "azalea-block",
  "azalea-buf",
@@ -373,7 +373,7 @@ dependencies = [
 [[package]]
 name = "azalea-inventory"
 version = "0.12.0+mc1.21.5"
-source = "git+https://github.com/azalea-rs/azalea#fd27ca3becb06f34e11638c00e703918f713dd96"
+source = "git+https://github.com/azalea-rs/azalea?rev=6a83a6f#6a83a6fa387170ae71fbe06791cf3afa20aac1df"
 dependencies = [
  "azalea-buf",
  "azalea-chat",
@@ -389,7 +389,7 @@ dependencies = [
 [[package]]
 name = "azalea-inventory-macros"
 version = "0.12.0+mc1.21.5"
-source = "git+https://github.com/azalea-rs/azalea#fd27ca3becb06f34e11638c00e703918f713dd96"
+source = "git+https://github.com/azalea-rs/azalea?rev=6a83a6f#6a83a6fa387170ae71fbe06791cf3afa20aac1df"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -399,7 +399,7 @@ dependencies = [
 [[package]]
 name = "azalea-language"
 version = "0.12.0+mc1.21.5"
-source = "git+https://github.com/azalea-rs/azalea#fd27ca3becb06f34e11638c00e703918f713dd96"
+source = "git+https://github.com/azalea-rs/azalea?rev=6a83a6f#6a83a6fa387170ae71fbe06791cf3afa20aac1df"
 dependencies = [
  "compact_str",
  "serde",
@@ -409,7 +409,7 @@ dependencies = [
 [[package]]
 name = "azalea-physics"
 version = "0.12.0+mc1.21.5"
-source = "git+https://github.com/azalea-rs/azalea#fd27ca3becb06f34e11638c00e703918f713dd96"
+source = "git+https://github.com/azalea-rs/azalea?rev=6a83a6f#6a83a6fa387170ae71fbe06791cf3afa20aac1df"
 dependencies = [
  "azalea-block",
  "azalea-core",
@@ -426,7 +426,7 @@ dependencies = [
 [[package]]
 name = "azalea-protocol"
 version = "0.12.0+mc1.21.5"
-source = "git+https://github.com/azalea-rs/azalea#fd27ca3becb06f34e11638c00e703918f713dd96"
+source = "git+https://github.com/azalea-rs/azalea?rev=6a83a6f#6a83a6fa387170ae71fbe06791cf3afa20aac1df"
 dependencies = [
  "async-recursion",
  "azalea-auth",
@@ -461,7 +461,7 @@ dependencies = [
 [[package]]
 name = "azalea-protocol-macros"
 version = "0.12.0+mc1.21.5"
-source = "git+https://github.com/azalea-rs/azalea#fd27ca3becb06f34e11638c00e703918f713dd96"
+source = "git+https://github.com/azalea-rs/azalea?rev=6a83a6f#6a83a6fa387170ae71fbe06791cf3afa20aac1df"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -471,7 +471,7 @@ dependencies = [
 [[package]]
 name = "azalea-registry"
 version = "0.12.0+mc1.21.5"
-source = "git+https://github.com/azalea-rs/azalea#fd27ca3becb06f34e11638c00e703918f713dd96"
+source = "git+https://github.com/azalea-rs/azalea?rev=6a83a6f#6a83a6fa387170ae71fbe06791cf3afa20aac1df"
 dependencies = [
  "azalea-buf",
  "azalea-registry-macros",
@@ -482,7 +482,7 @@ dependencies = [
 [[package]]
 name = "azalea-registry-macros"
 version = "0.12.0+mc1.21.5"
-source = "git+https://github.com/azalea-rs/azalea#fd27ca3becb06f34e11638c00e703918f713dd96"
+source = "git+https://github.com/azalea-rs/azalea?rev=6a83a6f#6a83a6fa387170ae71fbe06791cf3afa20aac1df"
 dependencies = [
  "quote",
  "syn",
@@ -491,7 +491,7 @@ dependencies = [
 [[package]]
 name = "azalea-world"
 version = "0.12.0+mc1.21.5"
-source = "git+https://github.com/azalea-rs/azalea#fd27ca3becb06f34e11638c00e703918f713dd96"
+source = "git+https://github.com/azalea-rs/azalea?rev=6a83a6f#6a83a6fa387170ae71fbe06791cf3afa20aac1df"
 dependencies = [
  "azalea-block",
  "azalea-buf",
@@ -858,6 +858,7 @@ dependencies = [
  "azalea",
  "bevy_ecs",
  "bevy_ecs_macros",
+ "parking_lot",
  "tokio",
  "utils",
 ]
@@ -2055,10 +2056,13 @@ version = "0.9.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1e401f977ab385c9e4e3ab30627d6f26d00e2c73eef317493c4ec6d468726cf8"
 dependencies = [
+ "backtrace",
  "cfg-if",
  "libc",
+ "petgraph",
  "redox_syscall",
  "smallvec",
+ "thread-id",
  "windows-targets 0.52.6",
 ]
 
@@ -2852,6 +2856,16 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn",
+]
+
+[[package]]
+name = "thread-id"
+version = "4.2.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cfe8f25bbdd100db7e1d34acf7fd2dc59c4bf8f7483f505eaa7d4f12f76cc0ea"
+dependencies = [
+ "libc",
+ "winapi",
 ]
 
 [[package]]

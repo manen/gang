@@ -5,4 +5,4 @@ members = ["client", "utils"]
 [workspace.dependencies]
 utils.path = "./utils"
 
-azalea.git = "https://github.com/azalea-rs/azalea"
+azalea = { git = "https://github.com/azalea-rs/azalea", rev = "6a83a6f" }
