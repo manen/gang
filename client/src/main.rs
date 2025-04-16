@@ -40,7 +40,7 @@ async fn main() -> anyhow::Result<()> {
 		.map(move |base| format!("{base}{suffix}"))
 	};
 	let accounts = accounts("")
-		// .chain(accounts("_1"))
+		.chain(accounts("_1"))
 		.map(|name| Account::offline(name.as_ref()))
 		.collect::<Vec<_>>();
 

@@ -858,6 +858,7 @@ dependencies = [
  "azalea",
  "bevy_ecs",
  "bevy_ecs_macros",
+ "futures",
  "parking_lot",
  "tokio",
  "utils",
