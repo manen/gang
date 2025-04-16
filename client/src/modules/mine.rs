@@ -21,6 +21,28 @@ pub async fn mine<'a, I: IntoIterator<Item = &'a str>>(
 	use azalea::blocks::blocks;
 	let mut iter = iter.into_iter();
 	match iter.next() {
+		Some("everything") => {
+			mine_a_lot(
+				swarm,
+				[
+					blocks::GrassBlock { snowy: false }.into(),
+					blocks::OakLog {
+						axis: azalea::blocks::properties::Axis::X,
+					}
+					.into(),
+					blocks::OakLog {
+						axis: azalea::blocks::properties::Axis::Y,
+					}
+					.into(),
+					blocks::OakLog {
+						axis: azalea::blocks::properties::Axis::Z,
+					}
+					.into(),
+					blocks::Dirt {}.into(),
+				],
+				30,
+			);
+		}
 		Some("grass") => {
 			mine_a_lot(swarm, [blocks::GrassBlock { snowy: false }.into()], 10);
 		}
@@ -56,7 +78,7 @@ pub async fn mine<'a, I: IntoIterator<Item = &'a str>>(
 }
 
 fn mine_a_lot<I: IntoIterator<Item = BlockState>>(swarm: Swarm, states: I, count_per_bot: i32) {
-	let mut occupied = Arc::new(Mutex::new(Vec::<BlockPos>::new()));
+	let occupied = Arc::new(Mutex::new(Vec::<BlockPos>::new()));
 
 	let states = states.into_iter();
 	let states = BlockStates {
@@ -64,7 +86,50 @@ fn mine_a_lot<I: IntoIterator<Item = BlockState>>(swarm: Swarm, states: I, count
 	};
 
 	for bot in swarm.into_iter() {
-		tokio::spawn(async move {});
+		let occupied = occupied.clone();
+		let states = states.clone();
+		tokio::spawn(async move {
+			for _ in 0..count_per_bot {
+				let me = bot.eye_position();
+
+				let pos = {
+					let mut blocks = {
+						let world = bot.world();
+						let world = world.read();
+						let blocks = world.find_blocks(me, &states);
+						blocks.take(10).collect::<Vec<_>>().into_iter()
+					};
+
+					let block = loop {
+						match blocks.next() {
+							Some(pos) => {
+								if !{
+									let occupied = occupied.lock().await;
+									occupied.contains(&pos)
+								} {
+									let mut occupied = occupied.lock().await;
+									occupied.push(pos);
+									break Some(pos);
+								}
+							}
+							None => break None,
+						}
+					};
+					block
+				};
+
+				if let Some(pos) = pos {
+					bot.goto(RadiusGoal {
+						pos: pos.center(),
+						radius: 3.5,
+					})
+					.await;
+
+					bot.look_at(pos.center());
+					bot.mine(pos).await;
+				}
+			}
+		});
 	}
 }
 
