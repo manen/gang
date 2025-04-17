@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["client", "utils"]
+members = ["client", "goals", "utils"]
 
 [profile.dev]
 opt-level = 1
