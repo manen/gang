@@ -33,11 +33,9 @@ async fn main() -> anyhow::Result<()> {
 	});
 
 	let accounts = |suffix| {
-		[
-			"pop", "bob", "test", "bot", "stick", "playboi", "carti", "jordan", "carter",
-		]
-		.into_iter()
-		.map(move |base| format!("{base}{suffix}"))
+		["pop", "bob", "test", "bot", "stick"]
+			.into_iter()
+			.map(move |base| format!("{base}{suffix}"))
 	};
 	let accounts = accounts("")
 		.chain(accounts("_1"))

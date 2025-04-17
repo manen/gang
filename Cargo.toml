@@ -2,6 +2,11 @@
 resolver = "2"
 members = ["client", "utils"]
 
+[profile.dev]
+opt-level = 1
+[profile.dev.package."*"]
+opt-level = 3
+
 [workspace.dependencies]
 utils.path = "./utils"
 

@@ -7,7 +7,7 @@ use azalea::{
 	pathfinder::goals::{BlockPosGoal, RadiusGoal},
 	prelude::PathfinderClientExt,
 	swarm::Swarm,
-	BlockPos, BotClientExt, Client,
+	BlockPos, BotClientExt, Client, Vec3,
 };
 use tokio::sync::Mutex;
 
@@ -147,7 +147,21 @@ async fn mine_everything(swarm: Swarm, from: (i32, i32, i32), to: (i32, i32, i32
 			loop {
 				let block = {
 					let mut blocks = blocks.lock().await;
-					blocks.pop_front()
+
+					loop {
+						let pos = blocks.pop_front();
+						if let Some(pos) = pos {
+							match bot.world().read().get_block_state(&pos) {
+								Some(block) if block.is_air() => {
+									continue;
+								}
+								Some(_) => break Some(pos),
+								None => continue,
+							}
+						} else {
+							break None;
+						}
+					}
 				};
 				if let Some(pos) = block {
 					println!("{} mining {pos:?}", bot.username());
@@ -157,6 +171,7 @@ async fn mine_everything(swarm: Swarm, from: (i32, i32, i32), to: (i32, i32, i32
 						radius: 3.5,
 					})
 					.await;
+					println!("{} got to goal", bot.username());
 
 					bot.look_at(pos.center());
 					bot.mine(pos).await;
@@ -168,7 +183,10 @@ async fn mine_everything(swarm: Swarm, from: (i32, i32, i32), to: (i32, i32, i32
 		}
 	});
 
+	let processes = processes.collect::<Vec<_>>();
 	futures::future::join_all(processes).await;
+
+	println!("mined everything");
 }
 
 fn mine_a_lot<I: IntoIterator<Item = BlockState>>(swarm: Swarm, states: I, count_per_bot: i32) {
