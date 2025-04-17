@@ -16,7 +16,28 @@ pub async fn path<'a, I: IntoIterator<Item = &'a str>>(
 ) -> anyhow::Result<()> {
 	let mut iter = iter.into_iter();
 	match iter.next() {
-		Some("here") => {}
+		Some("here") => {
+			use azalea::{
+				entity::{metadata::Player, Position},
+				GameProfileComponent,
+			};
+			use bevy_ecs::prelude::With;
+
+			let sender = chat
+				.sender()
+				.ok_or_else(|| anyhow!("message doesn't have a sender"))?;
+			let q = bot
+				.entity_by::<With<Player>, &GameProfileComponent>(
+					|profile: &&GameProfileComponent| profile.name == sender,
+				)
+				.ok_or_else(|| anyhow!("no player called that"))?;
+
+			let comp: Position = bot
+				.get_entity_component(q)
+				.ok_or_else(|| anyhow!("player doesn't have a location"))?;
+
+			bot.goto(BlockPosGoal(comp.into())).await
+		}
 		Some("around") => {
 			let radius = if let Some(radius) = iter.next() {
 				radius.parse()?
