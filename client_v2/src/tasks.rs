@@ -47,7 +47,7 @@ impl Task {
 				let eye_offset: Option<EyeHeight> = bot.get_entity_component(entity);
 				let eye_offset = eye_offset.map(|a| a.deref().clone()).unwrap_or_default();
 
-				let pos = loop {
+				let pos_now = || {
 					let pos: Position = bot.get_entity_component(entity).ok_or_else(|| {
 						anyhow!(
 							"there wasn't a position component on the entity {} was supposed to attack",
@@ -55,12 +55,39 @@ impl Task {
 						)
 					})?;
 					let pos = pos.down(0.0);
+					anyhow::Ok(pos)
+				};
 
-					let goal = RadiusGoal { pos, radius: 3.5 };
+				let pos = loop {
+					let start_pos = pos_now()?;
+					let goal = RadiusGoal {
+						pos: start_pos,
+						radius: 3.5,
+					};
 					if goal.success(bot.position().to_block_pos_floor()) {
-						break pos;
+						break start_pos;
 					} else {
-						bot.goto(goal).await;
+						// this is a reimplementation of bot.goto that will change the target if it moved too far
+						bot.start_goto(goal);
+						bot.wait_one_update().await;
+
+						let mut tick_broadcaster = bot.get_tick_broadcaster();
+						'pathing: while !bot.is_goto_target_reached() {
+							// check every tick
+							match tick_broadcaster.recv().await {
+								Ok(_) => (),
+								Err(_err) => (),
+							};
+							let pos = pos_now()?;
+							if pos.distance_to(&start_pos) >= 5.0 {
+								bot.stop_pathfinding();
+								println!(
+									"looping again in Attack, since the target entity has moved at least 5 blocks"
+								);
+								tokio::time::sleep(Duration::from_millis(100)).await;
+								break 'pathing;
+							}
+						}
 					}
 				};
 
