@@ -872,6 +872,7 @@ dependencies = [
  "pathfind",
  "tokio",
  "utils",
+ "uuid",
 ]
 
 [[package]]

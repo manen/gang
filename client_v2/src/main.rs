@@ -1,10 +1,13 @@
 #![feature(duration_constructors)]
 
-use std::{sync::Arc, time::Duration};
+use std::{ops::Deref, sync::Arc, time::Duration};
 
 use azalea::{
 	Account, BotClientExt, Client, Event,
+	entity::EntityUuid,
+	protocol::packets::game::ClientboundGamePacket,
 	swarm::{Swarm, SwarmBuilder, SwarmEvent},
+	world::MinecraftEntityId,
 };
 use tasks::{Task, Tasks};
 use tokio::{sync::Mutex, task::JoinHandle};
@@ -63,6 +66,7 @@ async fn main() -> anyhow::Result<()> {
 			State {
 				tasks: tasks.clone(),
 				handle: Arc::new(Mutex::new(None)),
+				self_eid: Arc::new(Mutex::new(None)),
 			},
 		)
 	}
@@ -71,6 +75,7 @@ async fn main() -> anyhow::Result<()> {
 		.set_swarm_state(State {
 			tasks: tasks.clone(),
 			handle: Arc::new(Mutex::new(None)),
+			self_eid: Arc::new(Mutex::new(None)),
 		})
 		.join_delay(Duration::from_millis(50))
 		.start("localhost")
@@ -81,6 +86,7 @@ async fn main() -> anyhow::Result<()> {
 pub struct State {
 	tasks: Tasks,
 	handle: Arc<Mutex<Option<JoinHandle<()>>>>,
+	self_eid: Arc<Mutex<Option<MinecraftEntityId>>>,
 }
 
 async fn swarm_handler(swarm: Swarm, event: SwarmEvent, state: State) {
@@ -153,6 +159,49 @@ async fn handle(bot: Client, event: Event, state: State) -> anyhow::Result<()> {
 		Event::Tick => {
 			state.tasks.tick(&bot).await;
 		}
+		Event::Packet(p) => match p.as_ref() {
+			ClientboundGamePacket::Login(login) => {
+				let mut eid = state.self_eid.lock().await;
+				*eid = Some(login.player_id);
+			}
+			ClientboundGamePacket::DamageEvent(dmg) => {
+				let self_eid = {
+					let self_eid = state.self_eid.lock().await;
+					*self_eid
+				};
+				if let Some(self_eid) = self_eid {
+					if dmg.entity_id == self_eid {
+						// i'm taking damage!!!
+						// println!("{dmg:#?}");
+
+						if let Some(source_id) = dmg.source_cause_id.0 {
+							let damager = {
+								let world = bot.world();
+								let world = world.read();
+								world
+									.entity_by_id
+									.get(&MinecraftEntityId(source_id as i32))
+									.cloned()
+							};
+
+							if let Some(damager) = damager {
+								let uuid: Option<EntityUuid> = bot.get_entity_component(damager);
+
+								if let Some(uuid) = uuid {
+									// send the signal for the others to attack
+									state.tasks.agro(&bot, uuid.deref().clone()).await;
+								} else {
+									eprintln!(
+										"got damaged and could identify the entity doing the damaging but that entity doesn't have a EntityUuid component"
+									)
+								}
+							}
+						}
+					}
+				}
+			}
+			_ => {}
+		},
 		_ => {}
 	}
 	Ok(())

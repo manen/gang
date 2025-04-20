@@ -1,6 +1,7 @@
 use std::{
 	borrow::Cow,
 	collections::VecDeque,
+	ops::Deref,
 	sync::Arc,
 	time::{Duration, Instant},
 };
@@ -9,13 +10,15 @@ use anyhow::Context;
 use anyhow::anyhow;
 use azalea::{
 	BlockPos, BotClientExt, Client, GameProfileComponent, Vec3,
-	entity::{Position, metadata::Player},
+	entity::{EyeHeight, Position, metadata::Player},
 	pathfinder::goals::{Goal, RadiusGoal},
 	prelude::PathfinderClientExt,
 	swarm::Swarm,
+	world::MinecraftEntityId,
 };
 use bevy_ecs::query::With;
 use tokio::sync::Mutex;
+use uuid::Uuid;
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Task {
@@ -24,10 +27,46 @@ pub enum Task {
 	Jump,
 	Goto(RadiusGoal),
 	Mine(BlockPos),
+	Attack(Uuid),
 }
 impl Task {
 	pub async fn execute(&self, bot: &Client) -> anyhow::Result<()> {
 		match self {
+			Self::Attack(uuid) => {
+				let entity = bot
+					.entity_by_uuid(*uuid)
+					.ok_or_else(|| anyhow!("couldn't find an entity with uuid {uuid}"))?;
+
+				let eid: MinecraftEntityId = bot.get_entity_component(entity).ok_or_else(|| {
+					anyhow!(
+						"there wasn't an entityid component on the entity {} was supposed to attack",
+						bot.username()
+					)
+				})?;
+
+				let eye_offset: Option<EyeHeight> = bot.get_entity_component(entity);
+				let eye_offset = eye_offset.map(|a| a.deref().clone()).unwrap_or_default();
+
+				let pos = loop {
+					let pos: Position = bot.get_entity_component(entity).ok_or_else(|| {
+						anyhow!(
+							"there wasn't a position component on the entity {} was supposed to attack",
+							bot.username()
+						)
+					})?;
+					let pos = pos.down(0.0);
+
+					let goal = RadiusGoal { pos, radius: 3.5 };
+					if goal.success(bot.position().to_block_pos_floor()) {
+						break pos;
+					} else {
+						bot.goto(goal).await;
+					}
+				};
+
+				bot.look_at(pos.up(eye_offset as _));
+				bot.attack(eid);
+			}
 			Self::Jump => {
 				bot.jump();
 			}
@@ -94,26 +133,35 @@ pub struct Tasks {
 	pub owner: Arc<Mutex<Cow<'static, str>>>,
 	pub owner_pos: Arc<Mutex<OwnerPos>>,
 	pub queue: Arc<Mutex<VecDeque<Task>>>,
+	pub priority: Arc<Mutex<Option<Task>>>,
 }
 impl Tasks {
 	pub async fn next(&self) -> Option<Task> {
+		let priority = {
+			let priority = self.priority.lock().await;
+			priority.clone()
+		};
+		if let Some(priority) = priority {
+			return Some(priority);
+		}
+
 		let from_queue = {
 			let mut queue = self.queue.lock().await;
 			queue.pop_front()
 		};
 		if let Some(from_queue) = from_queue {
-			Some(from_queue)
-		} else {
-			let owner_pos = self.owner_pos.lock().await.clone();
-			if owner_pos.time.elapsed() < Duration::from_mins(2) {
-				Some(Task::Goto(RadiusGoal {
-					pos: owner_pos.pos,
-					radius: 10.0,
-				}))
-			} else {
-				Some(Task::Jump)
-			}
+			return Some(from_queue);
 		}
+
+		let owner_pos = self.owner_pos.lock().await.clone();
+		if owner_pos.time.elapsed() < Duration::from_mins(2) {
+			return Some(Task::Goto(RadiusGoal {
+				pos: owner_pos.pos,
+				radius: 10.0,
+			}));
+		}
+
+		Some(Task::Jump)
 	}
 
 	pub async fn tick(&self, bot: &Client) {
@@ -137,6 +185,10 @@ impl Tasks {
 				}
 			}
 		}
+	}
+	pub async fn agro(&self, bot: &Client, uuid: Uuid) {
+		let mut priority = self.priority.lock().await;
+		*priority = Some(Task::Attack(uuid))
 	}
 
 	pub async fn handle_command<'a, I: IntoIterator<Item = &'a str>>(
@@ -207,8 +259,14 @@ impl Tasks {
 				*owner = Cow::Owned(name)
 			}
 			Some("stop") => {
-				let mut queue = self.queue.lock().await;
-				queue.clear();
+				{
+					let mut queue = self.queue.lock().await;
+					queue.clear();
+				}
+				{
+					let mut priority = self.priority.lock().await;
+					*priority = None;
+				}
 			}
 			_ => {}
 		}
