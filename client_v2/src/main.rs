@@ -60,11 +60,14 @@ async fn main() -> anyhow::Result<()> {
 		..Default::default()
 	};
 
-	for account in accounts {
+	for (i, account) in accounts.into_iter().enumerate() {
 		builder = builder.add_account_with_state(
 			account,
 			State {
-				tasks: tasks.clone(),
+				tasks: Tasks {
+					inst_id: Some(i as i32),
+					..tasks.clone()
+				},
 				handle: Arc::new(Mutex::new(None)),
 				self_eid: Arc::new(Mutex::new(None)),
 			},

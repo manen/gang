@@ -155,21 +155,54 @@ impl OwnerPos {
 	}
 }
 
+#[derive(Clone, Debug)]
+pub struct PerInstanceTasks {
+	already_executed: Vec<i32>,
+	task: Task,
+}
+impl Default for PerInstanceTasks {
+	fn default() -> Self {
+		Self {
+			already_executed: Vec::new(),
+			task: Task::Jump,
+		}
+	}
+}
+impl PerInstanceTasks {
+	pub fn assign_new(&mut self, task: Task) {
+		self.already_executed.clear();
+		self.task = task;
+	}
+
+	pub fn task_for(&mut self, id: i32) -> Option<Task> {
+		if self.already_executed.contains(&id) {
+			None
+		} else {
+			self.already_executed.push(id);
+			Some(self.task.clone())
+		}
+	}
+}
+
 #[derive(Default, Clone, Debug)]
 pub struct Tasks {
+	pub inst_id: Option<i32>,
+
 	pub owner: Arc<Mutex<Cow<'static, str>>>,
 	pub owner_pos: Arc<Mutex<OwnerPos>>,
 	pub queue: Arc<Mutex<VecDeque<Task>>>,
-	pub priority: Arc<Mutex<Option<Task>>>,
+	pub per_instance_task: Arc<Mutex<PerInstanceTasks>>,
 }
 impl Tasks {
 	pub async fn next(&self) -> Option<Task> {
-		let priority = {
-			let priority = self.priority.lock().await;
-			priority.clone()
-		};
-		if let Some(priority) = priority {
-			return Some(priority);
+		if let Some(inst_id) = self.inst_id {
+			let per_instance = {
+				let mut per_instance = self.per_instance_task.lock().await;
+				per_instance.task_for(inst_id)
+			};
+			if let Some(per_instance) = per_instance {
+				return Some(per_instance);
+			}
 		}
 
 		let from_queue = {
@@ -214,8 +247,8 @@ impl Tasks {
 		}
 	}
 	pub async fn agro(&self, bot: &Client, uuid: Uuid) {
-		let mut priority = self.priority.lock().await;
-		*priority = Some(Task::Attack(uuid))
+		let mut per_inst = self.per_instance_task.lock().await;
+		per_inst.assign_new(Task::Attack(uuid));
 	}
 
 	pub async fn handle_command<'a, I: IntoIterator<Item = &'a str>>(
@@ -286,14 +319,8 @@ impl Tasks {
 				*owner = Cow::Owned(name)
 			}
 			Some("stop") => {
-				{
-					let mut queue = self.queue.lock().await;
-					queue.clear();
-				}
-				{
-					let mut priority = self.priority.lock().await;
-					*priority = None;
-				}
+				let mut queue = self.queue.lock().await;
+				queue.clear();
 			}
 			_ => {}
 		}
