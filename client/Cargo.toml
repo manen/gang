@@ -7,8 +7,9 @@ edition = "2021"
 panic = "unwind"
 
 [dependencies]
-utils.workspace = true
 azalea.workspace = true
+pathfind.workspace = true
+utils.workspace = true
 anyhow = "1.0.97"
 bevy_ecs = "0.15.3"
 bevy_ecs_macros = "0.15.3"

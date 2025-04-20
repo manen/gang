@@ -1,6 +1,7 @@
 [workspace]
 resolver = "2"
-members = ["client", "goals", "utils"]
+members = ["client", "goals", "pathfind", "utils"]
+exclude = ["./azalea", "./azalea/*"]
 
 [profile.dev]
 opt-level = 1
@@ -8,6 +9,6 @@ opt-level = 1
 opt-level = 3
 
 [workspace.dependencies]
+azalea.path = "./azalea/azalea"
 utils.path = "./utils"
-
-azalea = { git = "https://github.com/azalea-rs/azalea", rev = "6a83a6f" }
+pathfind.path = "./pathfind"

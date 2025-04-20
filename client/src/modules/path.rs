@@ -1,7 +1,7 @@
 use anyhow::anyhow;
 use azalea::{
 	chat::ChatPacket,
-	pathfinder::goals::{BlockPosGoal, XZGoal, YGoal},
+	pathfinder::goals::{self, BlockPosGoal, RadiusGoal, XZGoal, YGoal},
 	prelude::PathfinderClientExt,
 	BlockPos, Client,
 };
@@ -71,6 +71,13 @@ pub async fn path<'a, I: IntoIterator<Item = &'a str>>(
 			})
 			.await
 		}
+		Some("away") => {
+			let pos = bot.position();
+			let goal = goals::RadiusGoal { pos, radius: 300.0 };
+			let goal = goals::InverseGoal(goal);
+
+			bot.goto(goal).await
+		}
 		Some("to") => {
 			{
 				let first = iter.next().ok_or_else(|| anyhow!("expected coordinates"))?;
@@ -94,6 +101,7 @@ pub async fn path<'a, I: IntoIterator<Item = &'a str>>(
 				}
 			};
 		}
+		Some("test") => pathfind::path_to(&bot).await,
 		_ => {}
 	}
 	Ok(())

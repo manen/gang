@@ -39,6 +39,8 @@ async fn main() -> anyhow::Result<()> {
 	};
 	let accounts = accounts("")
 		.chain(accounts("_1"))
+		.chain(accounts("_2"))
+		.chain(accounts("_3"))
 		.map(|name| Account::offline(name.as_ref()))
 		.collect::<Vec<_>>();
 
