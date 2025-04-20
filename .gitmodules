@@ -1,0 +1,3 @@
+[submodule "azalea"]
+	path = azalea
+	url = https://github.com/manen/azalea
