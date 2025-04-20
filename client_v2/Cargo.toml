@@ -1,0 +1,16 @@
+[package]
+name = "client_v2"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+azalea.workspace = true
+pathfind.workspace = true
+utils.workspace = true
+goals.workspace = true
+anyhow = "1.0.97"
+bevy_ecs = "0.15.3"
+bevy_ecs_macros = "0.15.3"
+tokio = { version = "1.44.2", features = ["macros", "rt-multi-thread"] }
+parking_lot = { version = "0.12", features = ["deadlock_detection"] }
+futures = "0.3.31"

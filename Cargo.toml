@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["client", "goals", "pathfind", "utils"]
+members = ["client", "client_v2", "goals", "pathfind", "utils"]
 exclude = ["./azalea", "./azalea/*"]
 
 [profile.dev]
@@ -11,4 +11,5 @@ opt-level = 3
 [workspace.dependencies]
 azalea.path = "./azalea/azalea"
 utils.path = "./utils"
+goals.path = "./goals"
 pathfind.path = "./pathfind"
