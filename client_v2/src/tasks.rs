@@ -155,20 +155,39 @@ impl OwnerPos {
 	}
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct PerInstanceTasks {
+	tasks: Vec<PerInstanceTask>,
+}
+impl PerInstanceTasks {
+	pub fn new_task(&mut self, task: Task) {
+		self.tasks.push(PerInstanceTask::new(task));
+	}
+	pub fn clear(&mut self) {
+		self.tasks.clear()
+	}
+	pub fn task_for(&mut self, id: i32) -> Option<Task> {
+		for per_inst in self.tasks.iter_mut() {
+			if let Some(per_inst) = per_inst.task_for(id) {
+				return Some(per_inst);
+			}
+		}
+		return None;
+	}
+}
+
+#[derive(Clone, Debug)]
+pub struct PerInstanceTask {
 	already_executed: Vec<i32>,
 	task: Task,
 }
-impl Default for PerInstanceTasks {
-	fn default() -> Self {
+impl PerInstanceTask {
+	pub fn new(task: Task) -> Self {
 		Self {
 			already_executed: Vec::new(),
-			task: Task::Jump,
+			task,
 		}
 	}
-}
-impl PerInstanceTasks {
 	pub fn assign_new(&mut self, task: Task) {
 		self.already_executed.clear();
 		self.task = task;
@@ -248,7 +267,7 @@ impl Tasks {
 	}
 	pub async fn agro(&self, bot: &Client, uuid: Uuid) {
 		let mut per_inst = self.per_instance_task.lock().await;
-		per_inst.assign_new(Task::Attack(uuid));
+		per_inst.new_task(Task::Attack(uuid));
 	}
 
 	pub async fn handle_command<'a, I: IntoIterator<Item = &'a str>>(
@@ -319,8 +338,14 @@ impl Tasks {
 				*owner = Cow::Owned(name)
 			}
 			Some("stop") => {
-				let mut queue = self.queue.lock().await;
-				queue.clear();
+				{
+					let mut queue = self.queue.lock().await;
+					queue.clear();
+				}
+				{
+					let mut per_inst = self.queue.lock().await;
+					per_inst.clear();
+				}
 			}
 			_ => {}
 		}
