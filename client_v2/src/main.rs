@@ -3,7 +3,7 @@
 use std::{sync::Arc, time::Duration};
 
 use azalea::{
-	Account, Client, Event,
+	Account, BotClientExt, Client, Event,
 	swarm::{Swarm, SwarmBuilder, SwarmEvent},
 };
 use tasks::{Task, Tasks};
@@ -41,7 +41,7 @@ async fn main() -> anyhow::Result<()> {
 	};
 	let accounts = accounts("")
 		.chain(accounts("_1"))
-		// .chain(accounts("_2"))
+		.chain(accounts("_2"))
 		// .chain(accounts("_3"))
 		.map(|name| Account::offline(name.as_ref()))
 		.collect::<Vec<_>>();
@@ -121,6 +121,19 @@ async fn handle(bot: Client, event: Event, state: State) -> anyhow::Result<()> {
 						let next = state.tasks.next().await;
 						if next == Some(Task::Halt) {
 							break;
+						}
+						let fluid_kind = {
+							let at = bot.position().to_block_pos_floor();
+							let world = bot.world();
+							let world = world.read();
+							world.get_fluid_state(&at).map(|a| a.kind)
+						};
+						{
+							use azalea::blocks::fluid_state::FluidKind;
+							match fluid_kind {
+								Some(FluidKind::Water) => bot.set_jumping(true),
+								_ => bot.set_jumping(false),
+							}
 						}
 						if let Some(task) = next {
 							match task.execute(&bot).await {

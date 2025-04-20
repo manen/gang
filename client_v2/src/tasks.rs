@@ -18,6 +18,7 @@ use tokio::sync::Mutex;
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Task {
+	/// halts task execution. if a bot receives this task it will not poll or execute any further tasks
 	Halt,
 	Jump,
 	Goto(RadiusGoal),
@@ -191,6 +192,10 @@ impl Tasks {
 						*queue = taken_queue.into_iter().chain(new_queue).collect();
 					}
 				}
+			}
+			Some("stop") => {
+				let mut queue = self.queue.lock().await;
+				queue.clear();
 			}
 			_ => {}
 		}
