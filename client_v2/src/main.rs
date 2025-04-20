@@ -52,7 +52,10 @@ async fn main() -> anyhow::Result<()> {
 
 	// tasks are created here, execution starts on Event::Spawn
 
-	let tasks = Tasks::default();
+	let tasks = Tasks {
+		owner: Arc::new(Mutex::new("manen_".into())),
+		..Default::default()
+	};
 
 	for account in accounts {
 		builder = builder.add_account_with_state(

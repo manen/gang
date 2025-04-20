@@ -1,4 +1,5 @@
 use std::{
+	borrow::Cow,
 	collections::VecDeque,
 	sync::Arc,
 	time::{Duration, Instant},
@@ -90,8 +91,9 @@ impl OwnerPos {
 
 #[derive(Default, Clone, Debug)]
 pub struct Tasks {
-	owner_pos: Arc<Mutex<OwnerPos>>,
-	queue: Arc<Mutex<VecDeque<Task>>>,
+	pub owner: Arc<Mutex<Cow<'static, str>>>,
+	pub owner_pos: Arc<Mutex<OwnerPos>>,
+	pub queue: Arc<Mutex<VecDeque<Task>>>,
 }
 impl Tasks {
 	pub async fn next(&self) -> Option<Task> {
@@ -121,9 +123,12 @@ impl Tasks {
 		};
 
 		if age > Duration::from_millis(300) {
-			let entity = bot.entity_by::<With<Player>, &GameProfileComponent>(
-				|profile: &&GameProfileComponent| profile.name == "manen_",
-			);
+			let entity = {
+				let find = self.owner.lock().await;
+				bot.entity_by::<With<Player>, &GameProfileComponent>(
+					|profile: &&GameProfileComponent| profile.name == *find,
+				)
+			};
 			if let Some(player) = entity {
 				let pos: Option<Position> = bot.get_entity_component(player);
 				if let Some(pos) = pos {
@@ -192,6 +197,14 @@ impl Tasks {
 						*queue = taken_queue.into_iter().chain(new_queue).collect();
 					}
 				}
+			}
+			Some("follow") => {
+				let name = words
+					.next()
+					.ok_or_else(|| anyhow!("expected player name after follow"))?;
+				let name = name.to_owned();
+				let mut owner = self.owner.lock().await;
+				*owner = Cow::Owned(name)
 			}
 			Some("stop") => {
 				let mut queue = self.queue.lock().await;
