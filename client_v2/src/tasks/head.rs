@@ -18,118 +18,6 @@ use bevy_ecs::query::With;
 use tokio::sync::Mutex;
 use uuid::Uuid;
 
-#[derive(Clone, Debug, PartialEq)]
-pub enum Task {
-	/// halts task execution. if a bot receives this task it will not poll or execute any further tasks
-	Halt,
-	Jump,
-	Goto(RadiusGoal),
-	Mine(BlockPos),
-	Attack(Uuid),
-}
-impl Task {
-	pub async fn execute(&self, bot: &Client) -> anyhow::Result<()> {
-		match self {
-			Self::Attack(uuid) => {
-				let entity = bot
-					.entity_by_uuid(*uuid)
-					.ok_or_else(|| anyhow!("couldn't find an entity with uuid {uuid}"))?;
-
-				let eid: MinecraftEntityId = bot.get_entity_component(entity).ok_or_else(|| {
-					anyhow!(
-						"there wasn't an entityid component on the entity {} was supposed to attack",
-						bot.username()
-					)
-				})?;
-
-				let eye_offset: Option<EyeHeight> = bot.get_entity_component(entity);
-				let eye_offset = eye_offset.map(|a| a.deref().clone()).unwrap_or_default();
-
-				let pos_now = || {
-					let pos: Position = bot.get_entity_component(entity).ok_or_else(|| {
-						anyhow!(
-							"there wasn't a position component on the entity {} was supposed to attack",
-							bot.username()
-						)
-					})?;
-					let pos = pos.down(0.0);
-					anyhow::Ok(pos)
-				};
-
-				let pos = loop {
-					let start_pos = pos_now()?;
-					let goal = RadiusGoal {
-						pos: start_pos,
-						radius: 3.5,
-					};
-					if goal.success(bot.position().to_block_pos_floor()) {
-						break start_pos;
-					} else {
-						// this is a reimplementation of bot.goto that will change the target if it moved too far
-						bot.start_goto(goal);
-						bot.wait_one_update().await;
-
-						let mut tick_broadcaster = bot.get_tick_broadcaster();
-						'pathing: while !bot.is_goto_target_reached() {
-							// check every tick
-							match tick_broadcaster.recv().await {
-								Ok(_) => (),
-								Err(_err) => (),
-							};
-							let pos = pos_now()?;
-							if pos.distance_to(&start_pos) >= 5.0 {
-								bot.stop_pathfinding();
-								println!(
-									"looping again in Attack, since the target entity has moved at least 5 blocks"
-								);
-								tokio::time::sleep(Duration::from_millis(100)).await;
-								break 'pathing;
-							}
-						}
-					}
-				};
-
-				bot.look_at(pos.up(eye_offset as _));
-				bot.attack(eid);
-				tokio::time::sleep(Duration::from_millis(400)).await
-			}
-			Self::Jump => {
-				bot.jump();
-			}
-			Self::Goto(goal) => {
-				if !goal.success(bot.position().to_block_pos_floor()) {
-					bot.start_goto(*goal);
-				}
-				tokio::time::sleep(Duration::from_millis(500)).await
-			}
-			Self::Mine(pos) => {
-				if !bot
-					.world()
-					.read()
-					.get_block_state(pos)
-					.map(|state| state.is_air())
-					.unwrap_or(false)
-				{
-					let goal = RadiusGoal {
-						pos: pos.center(),
-						radius: 3.5,
-					};
-
-					if !goal.success(bot.position().to_block_pos_floor()) {
-						bot.goto(goal).await;
-					}
-					bot.look_at(pos.center());
-					bot.mine(*pos).await;
-
-					tokio::time::sleep(Duration::from_millis(50)).await;
-				}
-			}
-			Self::Halt => {}
-		}
-		Ok(())
-	}
-}
-
 #[derive(Copy, Clone, Debug)]
 pub struct OwnerPos {
 	time: Instant,
@@ -215,14 +103,32 @@ impl PerInstanceTask {
 
 #[derive(Default, Clone, Debug)]
 pub struct Tasks {
-	pub inst_id: Option<i32>,
+	inst_id: Option<i32>,
 
-	pub owner: Arc<Mutex<Cow<'static, str>>>,
-	pub owner_pos: Arc<Mutex<OwnerPos>>,
-	pub queue: Arc<Mutex<VecDeque<Task>>>,
-	pub per_instance_task: Arc<Mutex<PerInstanceTasks>>,
+	owner: Arc<Mutex<Cow<'static, str>>>,
+	owner_pos: Arc<Mutex<OwnerPos>>,
+	queue: Arc<Mutex<VecDeque<Task>>>,
+	per_instance_task: Arc<Mutex<PerInstanceTasks>>,
 }
 impl Tasks {
+	pub fn with_owner(owner: impl Into<Cow<'static, str>>) -> Self {
+		Self {
+			owner: Arc::new(Mutex::new(owner.into())),
+			..Default::default()
+		}
+	}
+	pub fn set_inst_id(&mut self, inst_id: Option<i32>) {
+		self.inst_id = inst_id;
+	}
+
+	pub async fn append_to_queue(&self, new_queue: impl IntoIterator<Item = Task>) {
+		{
+			let mut queue = self.queue.lock().await;
+			let taken_queue = std::mem::replace(&mut *queue, Default::default());
+			*queue = taken_queue.into_iter().chain(new_queue).collect();
+		}
+	}
+
 	pub async fn next(&self) -> Option<Task> {
 		if let Some(inst_id) = self.inst_id {
 			let per_instance = {
@@ -323,21 +229,28 @@ impl Tasks {
 				let to_y = from.1.min(to.1);
 				let to_z = from.2.min(to.2);
 
-				{
-					let mut new_queue = VecDeque::new();
-					for y in (to_y..from_y + 1).rev() {
-						for x in to_x..from_x + 1 {
-							for z in to_z..from_z + 1 {
-								new_queue.push_back(Task::Mine(BlockPos { x, y, z }));
-							}
-						}
-					}
-					{
-						let mut queue = self.queue.lock().await;
-						let taken_queue = std::mem::replace(&mut *queue, Default::default());
-						*queue = taken_queue.into_iter().chain(new_queue).collect();
-					}
-				}
+				// {
+				// 	let mut new_queue = VecDeque::new();
+				// 	for y in (to_y..from_y + 1).rev() {
+				// 		for x in to_x..from_x + 1 {
+				// 			for z in to_z..from_z + 1 {
+				// 				new_queue.push_back(Task::Mine(BlockPos { x, y, z }));
+				// 			}
+				// 		}
+				// 	}
+				// }
+				self.append_to_queue(
+					(to_y..from_y + 1)
+						.rev()
+						.map(move |y| {
+							(to_x..from_x + 1).map(move |x| {
+								(to_z..from_z + 1).map(move |z| Task::Mine(BlockPos { x, y, z }))
+							})
+						})
+						.flatten()
+						.flatten(),
+				)
+				.await;
 			}
 			Some("follow") => {
 				let name = words

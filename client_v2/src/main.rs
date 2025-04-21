@@ -51,19 +51,15 @@ async fn main() -> anyhow::Result<()> {
 
 	// tasks are created here, execution starts on Event::Spawn
 
-	let tasks = Tasks {
-		owner: Arc::new(Mutex::new(DEFAULT_OWNER.into())),
-		..Default::default()
-	};
+	let tasks = Tasks::create_or_connect(DEFAULT_OWNER).await?;
 
 	for (i, account) in accounts.enumerate() {
+		let mut tasks = tasks.clone();
+		tasks.set_inst_id(Some(i as _));
 		builder = builder.add_account_with_state(
 			account,
 			State {
-				tasks: Tasks {
-					inst_id: Some(i as i32),
-					..tasks.clone()
-				},
+				tasks,
 				handle: Arc::new(Mutex::new(None)),
 				self_eid: Arc::new(Mutex::new(None)),
 			},
