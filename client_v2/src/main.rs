@@ -12,6 +12,8 @@ use azalea::{
 use tasks::{Task, Tasks};
 use tokio::{sync::Mutex, task::JoinHandle};
 
+const DEFAULT_OWNER: &str = "manen_";
+
 pub mod tasks;
 
 #[tokio::main]
@@ -45,7 +47,8 @@ async fn main() -> anyhow::Result<()> {
 	let accounts = accounts("")
 		.chain(accounts("_1"))
 		.chain(accounts("_2"))
-		// .chain(accounts("_3"))
+		.chain(accounts("_3"))
+		.chain(accounts("_4"))
 		.map(|name| Account::offline(name.as_ref()))
 		.collect::<Vec<_>>();
 
@@ -56,7 +59,7 @@ async fn main() -> anyhow::Result<()> {
 	// tasks are created here, execution starts on Event::Spawn
 
 	let tasks = Tasks {
-		owner: Arc::new(Mutex::new("manen_".into())),
+		owner: Arc::new(Mutex::new(DEFAULT_OWNER.into())),
 		..Default::default()
 	};
 

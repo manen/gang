@@ -1,19 +1,17 @@
 use std::{
 	borrow::Cow,
-	collections::VecDeque,
+	collections::{HashMap, VecDeque},
 	ops::Deref,
 	sync::Arc,
 	time::{Duration, Instant},
 };
 
-use anyhow::Context;
 use anyhow::anyhow;
 use azalea::{
 	BlockPos, BotClientExt, Client, GameProfileComponent, Vec3,
 	entity::{EyeHeight, Position, metadata::Player},
 	pathfinder::goals::{Goal, RadiusGoal},
 	prelude::PathfinderClientExt,
-	swarm::Swarm,
 	world::MinecraftEntityId,
 };
 use bevy_ecs::query::With;
@@ -93,6 +91,7 @@ impl Task {
 
 				bot.look_at(pos.up(eye_offset as _));
 				bot.attack(eid);
+				tokio::time::sleep(Duration::from_millis(400)).await
 			}
 			Self::Jump => {
 				bot.jump();
@@ -100,10 +99,8 @@ impl Task {
 			Self::Goto(goal) => {
 				if !goal.success(bot.position().to_block_pos_floor()) {
 					bot.start_goto(*goal);
-					tokio::time::sleep(Duration::from_millis(500)).await
-				} else {
-					tokio::time::sleep(Duration::from_millis(500)).await
 				}
+				tokio::time::sleep(Duration::from_millis(500)).await
 			}
 			Self::Mine(pos) => {
 				if !bot
@@ -163,6 +160,9 @@ impl PerInstanceTasks {
 	pub fn new_task(&mut self, task: Task) {
 		self.tasks.push(PerInstanceTask::new(task));
 	}
+	pub fn new_task_times(&mut self, task: Task, times: i32) {
+		self.tasks.push(PerInstanceTask::new_times(task, times));
+	}
 	pub fn clear(&mut self) {
 		self.tasks.clear()
 	}
@@ -178,13 +178,19 @@ impl PerInstanceTasks {
 
 #[derive(Clone, Debug)]
 pub struct PerInstanceTask {
-	already_executed: Vec<i32>,
+	already_executed: HashMap<i32, i32>,
+	/// how many times an instance is required to complete this task
+	times: i32,
 	task: Task,
 }
 impl PerInstanceTask {
 	pub fn new(task: Task) -> Self {
+		Self::new_times(task, 1)
+	}
+	pub fn new_times(task: Task, times: i32) -> Self {
 		Self {
-			already_executed: Vec::new(),
+			already_executed: Default::default(),
+			times,
 			task,
 		}
 	}
@@ -194,12 +200,16 @@ impl PerInstanceTask {
 	}
 
 	pub fn task_for(&mut self, id: i32) -> Option<Task> {
-		if self.already_executed.contains(&id) {
-			None
-		} else {
-			self.already_executed.push(id);
-			Some(self.task.clone())
+		if let Some(entry) = self.already_executed.get_mut(&id) {
+			if *entry >= self.times {
+				return None;
+			}
+			*entry += 1;
+			return Some(self.task.clone());
 		}
+
+		self.already_executed.insert(id, 1);
+		Some(self.task.clone())
 	}
 }
 
@@ -265,9 +275,9 @@ impl Tasks {
 			}
 		}
 	}
-	pub async fn agro(&self, bot: &Client, uuid: Uuid) {
+	pub async fn agro(&self, _bot: &Client, uuid: Uuid) {
 		let mut per_inst = self.per_instance_task.lock().await;
-		per_inst.new_task(Task::Attack(uuid));
+		per_inst.new_task_times(Task::Attack(uuid), 3);
 	}
 
 	pub async fn handle_command<'a, I: IntoIterator<Item = &'a str>>(
