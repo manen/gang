@@ -120,7 +120,11 @@ async fn handle(bot: Client, event: Event, state: State) -> anyhow::Result<()> {
 			}
 		}
 		Event::Spawn => {
-			// todo state.tasks.tick(&bot).await;
+			if let Some(tasks) = &state.tasks {
+				let mut tasks = tasks.lock().await;
+				tasks.tick(&bot).await?;
+			}
+
 			if state.handle.lock().await.is_none() {
 				let mut handle = state.handle.lock().await;
 				*handle = Some(tokio::spawn(async move {
@@ -132,7 +136,7 @@ async fn handle(bot: Client, event: Event, state: State) -> anyhow::Result<()> {
 									None => return Err(anyhow!("state.tasks is None")),
 								};
 								let mut tasks = tasks.lock().await;
-								tasks.next().await?
+								tasks.next(&bot).await?
 							};
 							if task == Task::Halt {
 								break;

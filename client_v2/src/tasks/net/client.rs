@@ -1,4 +1,5 @@
 use anyhow::anyhow;
+use azalea::Client;
 use honeypack::{PacketRead, PacketWrite};
 use tokio::net::TcpStream;
 
@@ -11,7 +12,6 @@ use super::ClientboundPacket;
 pub struct Tasks {
 	inst_id: i32,
 	stream: TcpStream,
-	owner: Option<String>,
 }
 impl Tasks {
 	pub async fn new(inst_id: i32) -> anyhow::Result<Self> {
@@ -21,14 +21,10 @@ impl Tasks {
 		let hello = ServerboundPacket::Hello { inst_id };
 		stream.write_as_packet(hello).await?;
 
-		Ok(Self {
-			inst_id,
-			stream,
-			owner: None,
-		})
+		Ok(Self { inst_id, stream })
 	}
 
-	pub async fn next(&mut self) -> anyhow::Result<crate::tasks::Task> {
+	pub async fn next(&mut self, bot: &Client) -> anyhow::Result<crate::tasks::Task> {
 		let request = ServerboundPacket::RequestTask {
 			inst_id: self.inst_id,
 		};
@@ -40,18 +36,45 @@ impl Tasks {
 				ClientboundPacket::AssignTask(task) => {
 					break task.ok_or_else(|| anyhow!("task is None"));
 				}
-				_ => self.handle_other(response),
+				_ => self.handle_other(response, bot).await?,
 			}
 		}
 	}
-	pub fn handle_other(&mut self, packet: ClientboundPacket) {
+	pub async fn handle_other(
+		&mut self,
+		packet: ClientboundPacket,
+		bot: &Client,
+	) -> anyhow::Result<()> {
 		match packet {
-			ClientboundPacket::OwnerIs { username } => {
-				self.owner = Some(username);
+			ClientboundPacket::Find { username } => {
+				use azalea::{
+					GameProfileComponent,
+					entity::{Position, metadata::Player},
+				};
+				use bevy_ecs::prelude::With;
+
+				let entity = bot.entity_by::<With<Player>, &GameProfileComponent>(
+					|profile: &&GameProfileComponent| profile.name == username,
+				);
+				let report = if let Some(player) = entity {
+					let pos: Option<Position> = bot.get_entity_component(player);
+					if let Some(pos) = pos {
+						crate::tasks::net::PosReport::Found(pos.down(0.0))
+					} else {
+						crate::tasks::net::PosReport::NotHere
+					}
+				} else {
+					crate::tasks::net::PosReport::NotHere
+				};
+				let report = ServerboundPacket::ReportPosition { username, report };
+				self.stream.write_as_packet(report).await?;
 			}
 			ClientboundPacket::AssignTask(_) => {}
 		}
+		Ok(())
 	}
 
-	pub async fn tick(&self, bot: &azalea::Client) {}
+	pub async fn tick(&mut self, bot: &azalea::Client) -> anyhow::Result<()> {
+		Ok(())
+	}
 }
