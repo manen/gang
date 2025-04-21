@@ -24,8 +24,6 @@ pub mod tasks;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-	println!("Hello, world!");
-
 	std::thread::spawn(move || {
 		loop {
 			std::thread::sleep(Duration::from_secs(10));
@@ -44,17 +42,54 @@ async fn main() -> anyhow::Result<()> {
 			}
 		}
 	});
+	// above is deadlock detection
+	// below is actual code
+
+	let mut args = std::env::args();
+	let arg0 = args.next().unwrap_or_default();
+
+	match args.next() {
+		Some(key) => match key.as_ref() {
+			"single_process" => single_process().await?,
+			"server" => server(args).await?,
+			"clients" => clients(args).await?,
+			_ => return Err(anyhow!("expected single_process, server or clients")),
+		},
+		None => {
+			eprintln!("expected arguments");
+			eprintln!("{arg0} single_process for legacy mode");
+			eprintln!("{arg0} server to launch tasks server");
+			eprintln!("{arg0} clients to launch clients");
+		}
+	}
+	Ok(())
+}
+
+async fn server(args: impl IntoIterator<Item = String>) -> anyhow::Result<()> {
+	let mut args = args.into_iter();
+	match args.next() {
+		Some(owner) => start_server(owner).await?,
+		None => {
+			eprintln!("expected owner's name / the name of the player they'll listen to");
+			return Err(anyhow!("error above"));
+		}
+	}
+	loop {
+		tokio::time::sleep(Duration::from_mins(1)).await;
+	}
+}
+
+async fn clients(args: impl IntoIterator<Item = String>) -> anyhow::Result<()> {
+	let mut args = args.into_iter();
+	let accounts = args.next().map(|a| a.parse().unwrap()).unwrap_or(ACCOUNTS);
 
 	let accounts = namegen::NameGen::default()
-		.take(ACCOUNTS)
+		.take(accounts)
 		.map(|name| Account::offline(name.as_ref()));
 
 	let mut builder = SwarmBuilder::new()
 		.set_handler(handle)
 		.set_swarm_handler(swarm_handler);
-
-	// tasks are created here, execution starts on Event::Spawn
-	start_server(DEFAULT_OWNER.into()).await?;
 
 	for (i, account) in accounts.enumerate() {
 		let tasks = Tasks::new(i as _).await?;
@@ -77,6 +112,15 @@ async fn main() -> anyhow::Result<()> {
 		.join_delay(Duration::from_millis(50))
 		.start("localhost")
 		.await?;
+}
+
+async fn single_process() -> anyhow::Result<()> {
+	println!("Hello, world!");
+
+	start_server(DEFAULT_OWNER.into()).await?;
+	clients(std::iter::empty()).await?;
+
+	Ok(())
 }
 
 #[derive(Default, Clone, bevy_ecs_macros::Component, bevy_ecs_macros::Resource)]
