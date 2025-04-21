@@ -2,6 +2,7 @@
 
 use std::{ops::Deref, sync::Arc, time::Duration};
 
+use anyhow::anyhow;
 use azalea::{
 	Account, BotClientExt, Client, Event,
 	entity::EntityUuid,
@@ -9,7 +10,10 @@ use azalea::{
 	swarm::{Swarm, SwarmBuilder, SwarmEvent},
 	world::MinecraftEntityId,
 };
-use tasks::{Task, Tasks};
+use tasks::{
+	Task, TasksTrait,
+	net::{Tasks, TasksHead},
+};
 use tokio::{sync::Mutex, task::JoinHandle};
 
 const DEFAULT_OWNER: &str = "manen_";
@@ -51,15 +55,14 @@ async fn main() -> anyhow::Result<()> {
 
 	// tasks are created here, execution starts on Event::Spawn
 
-	let tasks = Tasks::create_or_connect(DEFAULT_OWNER).await?;
+	let tasks = TasksHead::new().await?;
 
 	for (i, account) in accounts.enumerate() {
-		let mut tasks = tasks.clone();
-		tasks.set_inst_id(Some(i as _));
+		let mut tasks = Tasks::new(i as _).await?;
 		builder = builder.add_account_with_state(
 			account,
 			State {
-				tasks,
+				tasks: Some(Arc::new(Mutex::new(tasks))),
 				handle: Arc::new(Mutex::new(None)),
 				self_eid: Arc::new(Mutex::new(None)),
 			},
@@ -68,7 +71,7 @@ async fn main() -> anyhow::Result<()> {
 
 	builder
 		.set_swarm_state(State {
-			tasks: tasks.clone(),
+			tasks: Some(Arc::new(Mutex::new(Tasks::new(-1).await?))),
 			handle: Arc::new(Mutex::new(None)),
 			self_eid: Arc::new(Mutex::new(None)),
 		})
@@ -79,7 +82,7 @@ async fn main() -> anyhow::Result<()> {
 
 #[derive(Default, Clone, bevy_ecs_macros::Component, bevy_ecs_macros::Resource)]
 pub struct State {
-	tasks: Tasks,
+	tasks: Option<Arc<Mutex<Tasks>>>,
 	handle: Arc<Mutex<Option<JoinHandle<()>>>>,
 	self_eid: Arc<Mutex<Option<MinecraftEntityId>>>,
 }
@@ -91,10 +94,11 @@ async fn swarm_handler(swarm: Swarm, event: SwarmEvent, state: State) {
 			let mut words = content.split(' ');
 
 			if words.next() == Some("gang") {
-				match state.tasks.handle_command(words).await {
-					Ok(a) => a,
-					Err(err) => eprintln!("couldn't parse command {}: {err}", m.content()),
-				};
+				// match state.tasks.handle_command(words).await {
+				// 	Ok(a) => a,
+				// 	Err(err) => eprintln!("couldn't parse command {}: {err}", m.content()),
+				// };
+				println!("todo: not handling command {content}");
 			}
 		}
 		_ => {}
@@ -117,29 +121,36 @@ async fn handle(bot: Client, event: Event, state: State) -> anyhow::Result<()> {
 			}
 		}
 		Event::Spawn => {
-			state.tasks.tick(&bot).await;
+			// todo state.tasks.tick(&bot).await;
 			if state.handle.lock().await.is_none() {
 				let mut handle = state.handle.lock().await;
 				*handle = Some(tokio::spawn(async move {
-					loop {
-						let next = state.tasks.next().await;
-						if next == Some(Task::Halt) {
-							break;
-						}
-						let fluid_kind = {
-							let at = bot.position().to_block_pos_floor();
-							let world = bot.world();
-							let world = world.read();
-							world.get_fluid_state(&at).map(|a| a.kind)
-						};
-						{
-							use azalea::blocks::fluid_state::FluidKind;
-							match fluid_kind {
-								Some(FluidKind::Water) => bot.set_jumping(true),
-								_ => bot.set_jumping(false),
+					let internal = async move || -> anyhow::Result<()> {
+						loop {
+							let task = {
+								let tasks = match &state.tasks {
+									Some(a) => a,
+									None => return Err(anyhow!("state.tasks is None")),
+								};
+								let mut tasks = tasks.lock().await;
+								tasks.next().await?
+							};
+							if task == Task::Halt {
+								break;
 							}
-						}
-						if let Some(task) = next {
+							let fluid_kind = {
+								let at = bot.position().to_block_pos_floor();
+								let world = bot.world();
+								let world = world.read();
+								world.get_fluid_state(&at).map(|a| a.kind)
+							};
+							{
+								use azalea::blocks::fluid_state::FluidKind;
+								match fluid_kind {
+									Some(FluidKind::Water) => bot.set_jumping(true),
+									_ => bot.set_jumping(false),
+								}
+							}
 							match task.execute(&bot).await {
 								Ok(a) => a,
 								Err(err) => {
@@ -147,12 +158,19 @@ async fn handle(bot: Client, event: Event, state: State) -> anyhow::Result<()> {
 								}
 							};
 						}
+						Ok(())
+					};
+					match internal().await {
+						Ok(a) => a,
+						Err(err) => {
+							eprintln!("error on Event::Spawn: {err}");
+						}
 					}
 				}));
 			}
 		}
 		Event::Tick => {
-			state.tasks.tick(&bot).await;
+			// todo state.tasks.tick(&bot).await;
 		}
 		Event::Packet(p) => match p.as_ref() {
 			ClientboundGamePacket::Login(login) => {
@@ -184,7 +202,7 @@ async fn handle(bot: Client, event: Event, state: State) -> anyhow::Result<()> {
 
 								if let Some(uuid) = uuid {
 									// send the signal for the others to attack
-									state.tasks.agro(&bot, uuid.deref().clone()).await;
+									// todo state.tasks.agro(&bot, uuid.deref().clone()).await;
 								} else {
 									eprintln!(
 										"got damaged and could identify the entity doing the damaging but that entity doesn't have a EntityUuid component"

@@ -1,8 +1,11 @@
 use tokio::net::TcpListener;
 
-use crate::tasks::net::ServerboundPacket;
+use crate::tasks::{
+	Task,
+	net::{ClientboundPacket, ServerboundPacket},
+};
 
-use honeypack::PacketRead;
+use honeypack::{PacketRead, PacketWrite};
 
 #[derive(Debug)]
 pub struct TasksHead {}
@@ -21,16 +24,27 @@ impl TasksHead {
 				};
 
 				tokio::spawn(async move {
-					loop {
-						let packet: ServerboundPacket = match socket.read_as_packet().await {
-							Ok(a) => a,
-							Err(err) => {
-								eprintln!(
-									"failed to read ServerboundPacket from {addr}, closing its socket\n{err}"
-								);
-								return;
+					let mut internal = async move || -> anyhow::Result<()> {
+						loop {
+							let packet: ServerboundPacket = socket.read_as_packet().await?;
+
+							match packet {
+								ServerboundPacket::Hello { inst_id } => {
+									println!("{inst_id} said hi")
+								}
+								ServerboundPacket::RequestTask { inst_id } => {
+									let response = ClientboundPacket::AssignTask(Some(Task::Jump));
+									socket.write_as_packet(response).await?;
+								}
 							}
-						};
+						}
+					};
+					match internal().await {
+						Ok(a) => a,
+						Err(err) => {
+							eprintln!("server error while handling {addr}: {err}");
+							return;
+						}
 					}
 				});
 			}

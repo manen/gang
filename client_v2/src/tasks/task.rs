@@ -10,7 +10,7 @@ use azalea::{
 };
 use uuid::Uuid;
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum Task {
 	/// halts task execution. if a bot receives this task it will not poll or execute any further tasks
 	Halt,

@@ -38,7 +38,7 @@ impl<T: DeserializeOwned> Packet<T> {
 	}
 }
 impl<T: Serialize> Packet<T> {
-	pub async fn write_to<W: AsyncWrite>(&self, write: W) -> Result<Self> {
+	pub async fn write_to<W: AsyncWrite>(&self, write: W) -> Result<()> {
 		pin!(write);
 
 		let buf = bincode::serialize(&self.data)?;
@@ -47,6 +47,6 @@ impl<T: Serialize> Packet<T> {
 		write.write_u32(len).await?;
 		write.write(&buf).await?;
 
-		todo!()
+		Ok(())
 	}
 }
