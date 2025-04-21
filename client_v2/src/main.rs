@@ -13,7 +13,9 @@ use tasks::{Task, Tasks};
 use tokio::{sync::Mutex, task::JoinHandle};
 
 const DEFAULT_OWNER: &str = "manen_";
+const ACCOUNTS: usize = 20;
 
+pub mod namegen;
 pub mod tasks;
 
 #[tokio::main]
@@ -39,18 +41,9 @@ async fn main() -> anyhow::Result<()> {
 		}
 	});
 
-	let accounts = |suffix| {
-		["pop", "bob", "test", "bot", "stick"]
-			.into_iter()
-			.map(move |base| format!("{base}{suffix}"))
-	};
-	let accounts = accounts("")
-		.chain(accounts("_1"))
-		.chain(accounts("_2"))
-		.chain(accounts("_3"))
-		.chain(accounts("_4"))
-		.map(|name| Account::offline(name.as_ref()))
-		.collect::<Vec<_>>();
+	let accounts = namegen::NameGen::default()
+		.take(ACCOUNTS)
+		.map(|name| Account::offline(name.as_ref()));
 
 	let mut builder = SwarmBuilder::new()
 		.set_handler(handle)
@@ -63,7 +56,7 @@ async fn main() -> anyhow::Result<()> {
 		..Default::default()
 	};
 
-	for (i, account) in accounts.into_iter().enumerate() {
+	for (i, account) in accounts.enumerate() {
 		builder = builder.add_account_with_state(
 			account,
 			State {
