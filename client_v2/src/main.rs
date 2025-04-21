@@ -11,8 +11,8 @@ use azalea::{
 	world::MinecraftEntityId,
 };
 use tasks::{
-	Task, TasksTrait,
-	net::{Tasks, TasksHead},
+	Task,
+	net::{Tasks, start_server},
 };
 use tokio::{sync::Mutex, task::JoinHandle};
 
@@ -54,11 +54,10 @@ async fn main() -> anyhow::Result<()> {
 		.set_swarm_handler(swarm_handler);
 
 	// tasks are created here, execution starts on Event::Spawn
-
-	let tasks = TasksHead::new().await?;
+	start_server(DEFAULT_OWNER.into()).await?;
 
 	for (i, account) in accounts.enumerate() {
-		let mut tasks = Tasks::new(i as _).await?;
+		let tasks = Tasks::new(i as _).await?;
 		builder = builder.add_account_with_state(
 			account,
 			State {

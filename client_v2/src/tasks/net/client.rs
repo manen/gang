@@ -2,7 +2,7 @@ use anyhow::anyhow;
 use honeypack::{PacketRead, PacketWrite};
 use tokio::net::TcpStream;
 
-use crate::tasks::{TasksTrait, net::ServerboundPacket};
+use crate::tasks::net::ServerboundPacket;
 
 use super::ClientboundPacket;
 
@@ -22,10 +22,8 @@ impl Tasks {
 
 		Ok(Self { inst_id, stream })
 	}
-}
 
-impl TasksTrait for Tasks {
-	async fn next(&mut self) -> anyhow::Result<crate::tasks::Task> {
+	pub async fn next(&mut self) -> anyhow::Result<crate::tasks::Task> {
 		let request = ServerboundPacket::RequestTask {
 			inst_id: self.inst_id,
 		};
@@ -37,5 +35,5 @@ impl TasksTrait for Tasks {
 		}
 	}
 
-	async fn tick(&self, bot: &azalea::Client) {}
+	pub async fn tick(&self, bot: &azalea::Client) {}
 }

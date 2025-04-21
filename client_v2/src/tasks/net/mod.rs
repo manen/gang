@@ -4,7 +4,7 @@ pub mod client;
 pub mod head;
 
 pub use client::Tasks;
-pub use head::TasksHead;
+pub use head::start_server;
 
 use super::Task;
 
