@@ -56,8 +56,7 @@ pub async fn start_server(owner: String) -> anyhow::Result<()> {
 		let data = data.clone();
 		async move |sender, content: String| {
 			if let Some(sender) = sender {
-				let mut data = data.lock().await;
-				if data.owner == sender {
+				if data.lock().await.owner == sender {
 					println!("handling command {content}");
 
 					let mut words = content.split(' ');
@@ -112,10 +111,16 @@ pub async fn start_server(owner: String) -> anyhow::Result<()> {
 									.flatten()
 									.flatten();
 
+								let mut data = data.lock().await;
 								let queue_taken = std::mem::take(&mut data.task_queue);
 								data.task_queue = queue_taken.into_iter().chain(to_add).collect();
 
 								println!("{:?}", data.task_queue);
+							}
+							Some("stop") => {
+								let mut data = data.lock().await;
+								data.task_queue.clear();
+								data.per_inst.clear();
 							}
 							_ => {}
 						},

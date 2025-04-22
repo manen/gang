@@ -82,6 +82,10 @@ impl Task {
 				};
 
 				bot.look_at(pos.up(eye_offset as _));
+				bot.jump();
+				tokio::time::sleep(Duration::from_millis(400)).await;
+
+				bot.look_at(pos.up(eye_offset as _));
 				bot.attack(eid);
 				tokio::time::sleep(Duration::from_millis(400)).await
 			}
