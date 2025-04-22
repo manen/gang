@@ -2,7 +2,7 @@
 
 a minecraft bot swarm that:
 
-1. do tasks
+1. does tasks
 2. when anyone's attacked, everyone attacks back
 3. can clear entire areas
 4. if there's nothing else to do, follow their owner
@@ -24,6 +24,8 @@ since after like 20 or so bots in a single process all the bots would lag uncont
 the server coordinates username generation, the clients are pretty much slaves to the server
 
 ## usage
+
+minecraft version 1.21.5
 
 uses rust nightly so use rustup to configure your toolchain appropriately
 
