@@ -1,11 +1,13 @@
 use anyhow::anyhow;
-use azalea::Client;
+use azalea::{Client, chat::ChatPacket};
 use honeypack::{PacketRead, PacketWrite};
 use tokio::net::TcpStream;
 
-use crate::tasks::net::ServerboundPacket;
+use crate::tasks::net::{
+	ClientboundHelloPacket, ClientboundPacket, ServerboundHelloPacket, ServerboundPacket,
+};
 
-use super::ClientboundPacket;
+use super::hash_chat;
 
 #[derive(Debug)]
 /// a client for communicating with a TasksHead
@@ -14,14 +16,25 @@ pub struct Tasks {
 	stream: TcpStream,
 }
 impl Tasks {
-	pub async fn new(inst_id: i32) -> anyhow::Result<Self> {
+	/// there's no settings because the server pretty much just tells the client who it is \
+	/// returns: (inst_id, username, Tasks)
+	pub async fn new() -> anyhow::Result<(i32, String, Self)> {
 		let mut stream = TcpStream::connect(super::ADDR).await?;
 		println!("client connected to {}", super::ADDR);
 
-		let hello = ServerboundPacket::Hello { inst_id };
+		let hello = ServerboundHelloPacket { lucky_number: 6 };
 		stream.write_as_packet(hello).await?;
 
-		Ok(Self { inst_id, stream })
+		let hello: ClientboundHelloPacket = stream.read_as_packet().await?;
+
+		Ok((
+			hello.inst_id,
+			hello.name,
+			Self {
+				inst_id: hello.inst_id,
+				stream,
+			},
+		))
 	}
 
 	pub async fn next(&mut self, bot: &Client) -> anyhow::Result<crate::tasks::Task> {
@@ -75,6 +88,19 @@ impl Tasks {
 	}
 
 	pub async fn tick(&mut self, bot: &azalea::Client) -> anyhow::Result<()> {
+		Ok(())
+	}
+	pub async fn handle_chat(&mut self, m: &ChatPacket) -> anyhow::Result<()> {
+		let hash = hash_chat(m);
+		let (sender, content) = m.split_sender_and_content();
+
+		let packet = ServerboundPacket::ChatMessage {
+			hash,
+			sender,
+			content,
+		};
+		self.stream.write_as_packet(&packet).await?;
+
 		Ok(())
 	}
 }

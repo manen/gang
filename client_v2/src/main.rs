@@ -1,6 +1,7 @@
 #![feature(duration_constructors)]
+#![feature(exit_status_error)]
 
-use std::{ops::Deref, sync::Arc, time::Duration};
+use std::{ops::Deref, process::ExitStatus, sync::Arc, time::Duration};
 
 use anyhow::anyhow;
 use azalea::{
@@ -53,6 +54,7 @@ async fn main() -> anyhow::Result<()> {
 			"single_process" => single_process().await?,
 			"server" => server(args).await?,
 			"clients" => clients(args).await?,
+			"master" => master(args).await?,
 			_ => return Err(anyhow!("expected single_process, server or clients")),
 		},
 		None => {
@@ -60,8 +62,55 @@ async fn main() -> anyhow::Result<()> {
 			eprintln!("{arg0} single_process for legacy mode");
 			eprintln!("{arg0} server to launch tasks server");
 			eprintln!("{arg0} clients to launch clients");
+			eprintln!("{arg0} master to launch server & clients (multiprocessed)");
 		}
 	}
+	Ok(())
+}
+
+async fn master(args: impl IntoIterator<Item = String>) -> anyhow::Result<()> {
+	// gang master 5*20 (for now)
+
+	let mut args = args.into_iter();
+
+	let mul = args.next().ok_or_else(|| {
+		anyhow!("expected <number of clients per process>*<number of processes> <owner's name>")
+	})?;
+	let mut mul = mul.split('*');
+
+	let num_clients = mul.next().ok_or_else(|| {
+		anyhow!("expected <number of clients per process>*<number of processes> <owner's name>")
+	})?;
+	let num_processes = mul.next().ok_or_else(|| {
+		anyhow!("expected <number of clients per process>*<number of processes> <owner's name>")
+	})?;
+
+	let num_clients: i32 = num_clients.parse()?;
+	let num_processes: i32 = num_processes.parse()?;
+
+	let owner = args
+		.next()
+		.ok_or_else(|| anyhow!("expected owner's username"))?;
+
+	let processes = (0..num_processes).map(async |_| {
+		use tokio::process::Command;
+
+		let mut child = Command::new(std::env::args().next().expect("no arg0"))
+			.arg("clients")
+			.arg(format!("{num_clients}"))
+			.spawn()?;
+
+		let status = child.wait().await?;
+		status.exit_ok()?;
+		anyhow::Ok(())
+	});
+
+	start_server(owner).await?;
+	let processes = futures::future::join_all(processes).await;
+	for process in processes {
+		process?;
+	}
+
 	Ok(())
 }
 
@@ -83,16 +132,17 @@ async fn clients(args: impl IntoIterator<Item = String>) -> anyhow::Result<()> {
 	let mut args = args.into_iter();
 	let accounts = args.next().map(|a| a.parse().unwrap()).unwrap_or(ACCOUNTS);
 
-	let accounts = namegen::NameGen::default()
-		.take(accounts)
-		.map(|name| Account::offline(name.as_ref()));
-
 	let mut builder = SwarmBuilder::new()
 		.set_handler(handle)
 		.set_swarm_handler(swarm_handler);
 
-	for (i, account) in accounts.enumerate() {
-		let tasks = Tasks::new(i as _).await?;
+	// imma leave it like this
+	// but instead of RequestName we should make Hello mandatory and have it return an inst_id and the username to take
+
+	for _ in 0..accounts {
+		let (_, name, tasks) = Tasks::new().await?;
+		let account = Account::offline(&name);
+
 		builder = builder.add_account_with_state(
 			account,
 			State {
@@ -105,7 +155,9 @@ async fn clients(args: impl IntoIterator<Item = String>) -> anyhow::Result<()> {
 
 	builder
 		.set_swarm_state(State {
-			tasks: Some(Arc::new(Mutex::new(Tasks::new(-1).await?))),
+			tasks: Some(Arc::new(Mutex::new(
+				Tasks::new().await.map(|(_, _, tasks)| tasks)?,
+			))),
 			handle: Arc::new(Mutex::new(None)),
 			self_eid: Arc::new(Mutex::new(None)),
 		})
@@ -133,15 +185,12 @@ pub struct State {
 async fn swarm_handler(swarm: Swarm, event: SwarmEvent, state: State) {
 	match event {
 		SwarmEvent::Chat(m) => {
-			let content = m.content();
-			let mut words = content.split(' ');
-
-			if words.next() == Some("gang") {
-				// match state.tasks.handle_command(words).await {
-				// 	Ok(a) => a,
-				// 	Err(err) => eprintln!("couldn't parse command {}: {err}", m.content()),
-				// };
-				println!("todo: not handling command {content}");
+			if let Some(tasks) = state.tasks {
+				let mut tasks = tasks.lock().await;
+				match tasks.handle_chat(&m).await {
+					Ok(a) => a,
+					Err(err) => eprintln!("couldn't parse command {}: {err}", m.content()),
+				};
 			}
 		}
 		_ => {}

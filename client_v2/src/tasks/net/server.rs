@@ -1,14 +1,22 @@
 use std::{
+	collections::VecDeque,
+	iter::Enumerate,
 	sync::Arc,
 	time::{Duration, Instant},
 };
 
-use azalea::{Vec3, pathfinder::goals::RadiusGoal};
+use anyhow::anyhow;
+use azalea::{BlockPos, Vec3, pathfinder::goals::RadiusGoal};
 use tokio::{net::TcpListener, sync::Mutex};
 
-use crate::tasks::{
-	Task,
-	net::{ClientboundPacket, ServerboundPacket},
+use crate::{
+	namegen::NameGen,
+	tasks::{
+		Task,
+		net::{
+			ClientboundHelloPacket, ClientboundPacket, ServerboundHelloPacket, ServerboundPacket,
+		},
+	},
 };
 
 use honeypack::{PacketRead, PacketWrite};
@@ -17,8 +25,12 @@ use super::PosReport;
 
 #[derive(Debug)]
 struct ServerData {
+	namegen: Enumerate<NameGen<'static>>,
 	owner: String,
 	owner_pos: (Instant, Vec3),
+	chat_hash_handled: Vec<u64>,
+
+	task_queue: VecDeque<Task>,
 }
 
 /// functional baby
@@ -28,10 +40,101 @@ pub async fn start_server(owner: String) -> anyhow::Result<()> {
 	let data = ServerData {
 		owner,
 		owner_pos: (Instant::now() - Duration::from_hours(1), Vec3::default()),
+		namegen: NameGen::default().enumerate(),
+		chat_hash_handled: Vec::new(),
+		task_queue: VecDeque::new(),
 	};
 	let data = Arc::new(Mutex::new(data));
 	let clients: Vec<Arc<Mutex<tokio::net::TcpStream>>> = Vec::new();
 	let clients = Arc::new(Mutex::new(clients));
+
+	let handle_chat = {
+		let data = data.clone();
+		async move |sender, content: String| {
+			if let Some(sender) = sender {
+				let mut data = data.lock().await;
+				if data.owner == sender {
+					println!("handling command {content}");
+
+					let mut words = content.split(' ');
+
+					match words.next() {
+						Some("gang") => match words.next() {
+							Some("demolish") => {
+								let from_x: i32 = words
+									.next()
+									.ok_or_else(|| anyhow!("expected x coordinate"))?
+									.parse()?;
+								let from_y: i32 = words
+									.next()
+									.ok_or_else(|| anyhow!("expected y coordinate"))?
+									.parse()?;
+								let from_z: i32 = words
+									.next()
+									.ok_or_else(|| anyhow!("expected z coordinate"))?
+									.parse()?;
+
+								let to_x: i32 = words
+									.next()
+									.ok_or_else(|| anyhow!("expected x coordinate"))?
+									.parse()?;
+								let to_y: i32 = words
+									.next()
+									.ok_or_else(|| anyhow!("expected y coordinate"))?
+									.parse()?;
+								let to_z: i32 = words
+									.next()
+									.ok_or_else(|| anyhow!("expected z coordinate"))?
+									.parse()?;
+
+								let from = (from_x, from_y, from_z);
+								let to = (to_x, to_y, to_z);
+
+								let from_x = from.0.max(to.0);
+								let from_y = from.1.max(to.1);
+								let from_z = from.2.max(to.2);
+								let to_x = from.0.min(to.0);
+								let to_y = from.1.min(to.1);
+								let to_z = from.2.min(to.2);
+
+								let to_add = (to_y..from_y + 1)
+									.rev()
+									.map(move |y| {
+										(to_x..from_x + 1).map(move |x| {
+											(to_z..from_z + 1)
+												.map(move |z| Task::Mine(BlockPos { x, y, z }))
+										})
+									})
+									.flatten()
+									.flatten();
+
+								let queue_taken = std::mem::take(&mut data.task_queue);
+								data.task_queue = queue_taken.into_iter().chain(to_add).collect();
+
+								println!("{:?}", data.task_queue);
+							}
+							_ => {}
+						},
+						_ => {}
+					}
+				}
+			}
+
+			anyhow::Ok(())
+		}
+	};
+	let handle_chat = Arc::new(handle_chat);
+
+	{
+		let data = data.clone();
+		tokio::spawn(async move {
+			tokio::time::sleep(Duration::from_secs(15)).await;
+			{
+				let mut data = data.lock().await;
+				data.chat_hash_handled.clear();
+			}
+		});
+	}
 	{
 		let data = data.clone();
 		let clients = clients.clone();
@@ -88,13 +191,36 @@ pub async fn start_server(owner: String) -> anyhow::Result<()> {
 		// request handler
 		tokio::spawn(async move {
 			loop {
-				let (socket, addr) = match listener.accept().await {
+				let (mut socket, addr) = match listener.accept().await {
 					Ok(a) => a,
 					Err(err) => {
 						eprintln!("server failed to accept connection: {err}");
 						continue;
 					}
 				};
+				let mut hi = async || -> anyhow::Result<()> {
+					let hello: ServerboundHelloPacket = socket.read_as_packet().await?;
+
+					let name = {
+						let mut data = data.lock().await;
+						data.namegen.next()
+					};
+					let (i, name) = name.expect("namegen is never supposed to return none");
+					println!("[{hello:?}] hello {i}: {name}");
+
+					let hello_resp = ClientboundHelloPacket {
+						name,
+						inst_id: i as _,
+					};
+					socket.write_as_packet(&hello_resp).await?;
+					Ok(())
+				};
+				match hi().await {
+					Ok(a) => a,
+					Err(err) => {
+						eprintln!("error while exchanging Hello packets: {err}")
+					}
+				}
 
 				let socket = Arc::new(Mutex::new(socket));
 				{
@@ -102,6 +228,7 @@ pub async fn start_server(owner: String) -> anyhow::Result<()> {
 				}
 
 				let data = data.clone();
+				let handle_chat = handle_chat.clone();
 				tokio::spawn(async move {
 					let internal = async || -> anyhow::Result<()> {
 						loop {
@@ -111,17 +238,38 @@ pub async fn start_server(owner: String) -> anyhow::Result<()> {
 							};
 
 							match packet {
-								ServerboundPacket::Hello { inst_id } => {
-									println!("{inst_id} said hi");
+								ServerboundPacket::ChatMessage {
+									hash,
+									sender,
+									content,
+								} => {
+									{
+										let mut data = data.lock().await;
+										if data.chat_hash_handled.contains(&hash) {
+											// it's cool
+											continue;
+										} else {
+											data.chat_hash_handled.push(hash);
+										}
+									}
+									println!("{}: {content}", sender.clone().unwrap_or_default());
+
+									handle_chat(sender, content).await?;
 								}
 								ServerboundPacket::RequestTask { inst_id } => {
 									let task = {
-										let data = data.lock().await;
-										let (time, pos) = data.owner_pos;
-										if time.elapsed() < Duration::from_secs(30) {
-											Task::Goto(RadiusGoal { pos, radius: 10.0 })
+										let mut data = data.lock().await;
+
+										let from_queue = data.task_queue.pop_front();
+										if let Some(from_queue) = from_queue {
+											from_queue
 										} else {
-											Task::Jump
+											let (time, pos) = data.owner_pos;
+											if time.elapsed() < Duration::from_secs(30) {
+												Task::Goto(RadiusGoal { pos, radius: 10.0 })
+											} else {
+												Task::Jump
+											}
 										}
 									};
 
