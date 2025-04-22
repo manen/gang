@@ -8,6 +8,7 @@ use std::borrow::Cow;
 use azalea::{Vec3, chat::ChatPacket, core::math::lcm};
 pub use client::Tasks;
 pub use server::start_server;
+use uuid::Uuid;
 
 use super::Task;
 
@@ -40,6 +41,8 @@ pub enum ServerboundPacket {
 		sender: Option<String>,
 		content: String,
 	},
+	/// signals others to attack the entity with the given uuid
+	Agro { uuid: Uuid },
 
 	/// requests the next task for this instance \
 	/// server will return ClientboundPacket::AssignTask

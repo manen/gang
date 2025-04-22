@@ -298,7 +298,10 @@ async fn handle(bot: Client, event: Event, state: State) -> anyhow::Result<()> {
 
 								if let Some(uuid) = uuid {
 									// send the signal for the others to attack
-									// todo state.tasks.agro(&bot, uuid.deref().clone()).await;
+									if let Some(tasks) = state.tasks {
+										let mut tasks = tasks.lock().await;
+										tasks.agro(uuid.deref().clone()).await?;
+									}
 								} else {
 									eprintln!(
 										"got damaged and could identify the entity doing the damaging but that entity doesn't have a EntityUuid component"

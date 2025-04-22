@@ -9,6 +9,8 @@ use anyhow::anyhow;
 use azalea::{BlockPos, Vec3, pathfinder::goals::RadiusGoal};
 use tokio::{net::TcpListener, sync::Mutex};
 
+pub mod per_inst;
+
 use crate::{
 	namegen::NameGen,
 	tasks::{
@@ -31,6 +33,7 @@ struct ServerData {
 	chat_hash_handled: Vec<u64>,
 
 	task_queue: VecDeque<Task>,
+	per_inst: per_inst::PerInstanceTasks,
 }
 
 /// functional baby
@@ -43,6 +46,7 @@ pub async fn start_server(owner: String) -> anyhow::Result<()> {
 		namegen: NameGen::default().enumerate(),
 		chat_hash_handled: Vec::new(),
 		task_queue: VecDeque::new(),
+		per_inst: per_inst::PerInstanceTasks::default(),
 	};
 	let data = Arc::new(Mutex::new(data));
 	let clients: Vec<Arc<Mutex<tokio::net::TcpStream>>> = Vec::new();
@@ -256,19 +260,27 @@ pub async fn start_server(owner: String) -> anyhow::Result<()> {
 
 									handle_chat(sender, content).await?;
 								}
+								ServerboundPacket::Agro { uuid } => {
+									let mut data = data.lock().await;
+									data.per_inst.new_task_times(Task::Attack(uuid), 3);
+								}
 								ServerboundPacket::RequestTask { inst_id } => {
 									let task = {
 										let mut data = data.lock().await;
 
-										let from_queue = data.task_queue.pop_front();
-										if let Some(from_queue) = from_queue {
-											from_queue
+										if let Some(per_inst) = data.per_inst.task_for(inst_id) {
+											per_inst
 										} else {
-											let (time, pos) = data.owner_pos;
-											if time.elapsed() < Duration::from_secs(30) {
-												Task::Goto(RadiusGoal { pos, radius: 10.0 })
+											let from_queue = data.task_queue.pop_front();
+											if let Some(from_queue) = from_queue {
+												from_queue
 											} else {
-												Task::Jump
+												let (time, pos) = data.owner_pos;
+												if time.elapsed() < Duration::from_secs(30) {
+													Task::Goto(RadiusGoal { pos, radius: 10.0 })
+												} else {
+													Task::Jump
+												}
 											}
 										}
 									};

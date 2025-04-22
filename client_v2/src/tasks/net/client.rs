@@ -2,6 +2,7 @@ use anyhow::anyhow;
 use azalea::{Client, chat::ChatPacket};
 use honeypack::{PacketRead, PacketWrite};
 use tokio::net::TcpStream;
+use uuid::Uuid;
 
 use crate::tasks::net::{
 	ClientboundHelloPacket, ClientboundPacket, ServerboundHelloPacket, ServerboundPacket,
@@ -99,6 +100,12 @@ impl Tasks {
 			sender,
 			content,
 		};
+		self.stream.write_as_packet(&packet).await?;
+
+		Ok(())
+	}
+	pub async fn agro(&mut self, uuid: Uuid) -> anyhow::Result<()> {
+		let packet = ServerboundPacket::Agro { uuid };
 		self.stream.write_as_packet(&packet).await?;
 
 		Ok(())
