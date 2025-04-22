@@ -11,7 +11,7 @@ a minecraft bot swarm that:
 ![demo of bots mining a large cube of dirt](./imgs/demo2.png)
 ![demo of bots mining a large cube of dirt](./imgs/demo3.png)
 
-made possible by rust and [azaela](https://github.com/azalea-rs/azalea)
+made possible by rust and [azalea](https://github.com/azalea-rs/azalea)
 
 ## under the hood
 
